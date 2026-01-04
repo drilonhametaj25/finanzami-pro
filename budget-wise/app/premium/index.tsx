@@ -69,8 +69,8 @@ export default function PaywallScreen() {
 
   // Mock prices for development (when RevenueCat products aren't available)
   const mockPrices = {
-    monthly: { priceString: '2,99 €', price: 2.99 },
-    yearly: { priceString: '19,99 €', price: 19.99 },
+    monthly: { priceString: '3,99 €', price: 3.99 },
+    yearly: { priceString: '29,99 €', price: 29.99 },
   };
 
   const getMonthlyPrice = () => monthlyPackage?.product?.priceString || mockPrices.monthly.priceString;
@@ -87,7 +87,7 @@ export default function PaywallScreen() {
       // In development mode, show info about production
       Alert.alert(
         'Modalita Sviluppo',
-        'Gli acquisti in-app sono disponibili solo nella versione pubblicata dell\'app.\n\nPrezzi:\n• Mensile: 2,99€/mese\n• Annuale: 19,99€/anno (risparmia 37%)',
+        'Gli acquisti in-app sono disponibili solo nella versione pubblicata dell\'app.\n\nPrezzi:\n• Mensile: 3,99€/mese\n• Annuale: 29,99€/anno (risparmia 37%)',
         [{ text: 'OK' }]
       );
       return;

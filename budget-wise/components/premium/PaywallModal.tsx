@@ -45,8 +45,8 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
 
   // Mock prices for development (when RevenueCat products aren't available)
   const mockPrices = {
-    monthly: { priceString: '2,99 €', price: 2.99 },
-    yearly: { priceString: '19,99 €', price: 19.99 },
+    monthly: { priceString: '3,99 €', price: 3.99 },
+    yearly: { priceString: '29,99 €', price: 29.99 },
   };
 
   const getMonthlyPrice = () => monthlyPackage?.product?.priceString || mockPrices.monthly.priceString;
