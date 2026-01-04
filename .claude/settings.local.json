@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-expo-app@latest:*)",
+      "Bash(npx expo install:*)",
+      "Bash(npm install:*)",
+      "Bash(dir \"C:\\\\Users\\\\drilo\\\\workspace\\\\finanzami\\\\budget-wise\\\\node_modules\\\\react-native-url-polyfill\")",
+      "Bash(npx tsc --noEmit)",
+      "Bash(ls -la \"C:\\\\Users\\\\drilo\\\\workspace\\\\finanzami\\\\budget-wise\\\\stores\"\" 2>nul || echo \"Directory non trovata \")",
+      "WebSearch",
+      "Bash(npx tsc:*)",
+      "WebFetch(domain:enablebanking.com)",
+      "WebFetch(domain:teller.io)",
+      "Bash(ls:*)",
+      "WebFetch(domain:tink.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(dir:*)",
+      "WebFetch(domain:docs.saltedge.com)",
+      "Bash(supabase:*)",
+      "Bash(scoop:*)",
+      "Bash(winget:*)",
+      "Bash(npx supabase --version)",
+      "Bash(npx supabase login)",
+      "Bash(npx supabase:*)",
+      "Bash(set:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_b7b2d8ae8e2fb9057767df25010d5707f1e8f719 npx supabase link:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_b7b2d8ae8e2fb9057767df25010d5707f1e8f719 npx supabase:*)",
+      "Bash(npm ls:*)",
+      "Bash(cat:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_ce73cf2bb33c04dc5b26f688547006a41e6a52d3 npx supabase:*)",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\drilo\\\\workspace\\\\finanzami\\\\budget-wise && npx expo install expo-linear-gradient\")",
+      "Bash(powershell -Command \"Set-Location ''C:\\\\Users\\\\drilo\\\\workspace\\\\finanzami\\\\budget-wise''; npx expo install expo-linear-gradient\")"
+    ]
+  }
+}
