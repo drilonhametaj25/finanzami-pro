@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.drilonhametaj.budgetwise",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Permette di allegare foto degli scontrini alle transazioni",
         "NSCameraUsageDescription": "Permette di scattare foto degli scontrini",
