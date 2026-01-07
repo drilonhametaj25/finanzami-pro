@@ -15,7 +15,7 @@ import {
   TextInput,
   SegmentedButtons,
 } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,6 +26,7 @@ import {
   useSubscriptionStore,
   Subscription,
   SUBSCRIPTION_PRESETS,
+  SUBSCRIPTION_CATEGORIES,
 } from '../../stores/subscriptionStore';
 import { useAuthStore } from '../../stores/authStore';
 import { usePremiumStore } from '../../stores/premiumStore';
@@ -42,6 +43,7 @@ const FREQUENCY_LABELS = {
 export default function SubscriptionsScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { profile } = useAuthStore();
   const { canUseFeature } = usePremiumStore();
 
@@ -84,11 +86,17 @@ export default function SubscriptionsScreen() {
     getYearlyTotal,
     getUpcomingRenewals,
     getUnusedSubscriptions,
+    getCategorySpending,
+    setCategoryBudget,
+    categoryBudgets,
   } = useSubscriptionStore();
 
   const [menuVisible, setMenuVisible] = useState<string | null>(null);
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
+  const [budgetModalVisible, setBudgetModalVisible] = useState(false);
+  const [editingBudgetCategory, setEditingBudgetCategory] = useState<string | null>(null);
+  const [budgetAmount, setBudgetAmount] = useState('');
 
   // Form state
   const [name, setName] = useState('');
@@ -96,6 +104,7 @@ export default function SubscriptionsScreen() {
   const [frequency, setFrequency] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
   const [icon, setIcon] = useState('credit-card');
   const [color, setColor] = useState('#6200EE');
+  const [categoryId, setCategoryId] = useState<string | null>(null);
 
   const currency = profile?.main_currency || 'EUR';
   const monthlyTotal = getMonthlyTotal();
@@ -120,7 +129,7 @@ export default function SubscriptionsScreen() {
       amount: parseFloat(amount),
       frequency,
       nextBillingDate: format(new Date(), 'yyyy-MM-dd'),
-      categoryId: null,
+      categoryId,
       reminderDaysBefore: 3,
       isActive: true,
       lastUsedAt: null,
@@ -140,6 +149,7 @@ export default function SubscriptionsScreen() {
       color,
       amount: parseFloat(amount),
       frequency,
+      categoryId,
     });
 
     resetForm();
@@ -151,6 +161,24 @@ export default function SubscriptionsScreen() {
     setAmount(preset.amount.toString());
     setIcon(preset.icon);
     setColor(preset.color);
+    setCategoryId(preset.categoryId);
+  };
+
+  const handleSaveBudget = () => {
+    if (!editingBudgetCategory || !budgetAmount) return;
+    const budget = parseFloat(budgetAmount);
+    if (isNaN(budget) || budget <= 0) return;
+    setCategoryBudget(editingBudgetCategory, budget);
+    setBudgetModalVisible(false);
+    setEditingBudgetCategory(null);
+    setBudgetAmount('');
+  };
+
+  const openBudgetModal = (catId: string) => {
+    const existing = categoryBudgets.find((b) => b.categoryId === catId);
+    setEditingBudgetCategory(catId);
+    setBudgetAmount(existing?.budget?.toString() || '');
+    setBudgetModalVisible(true);
   };
 
   const handleEdit = (sub: Subscription) => {
@@ -160,6 +188,7 @@ export default function SubscriptionsScreen() {
     setFrequency(sub.frequency);
     setIcon(sub.icon);
     setColor(sub.color);
+    setCategoryId(sub.categoryId);
     setMenuVisible(null);
   };
 
@@ -169,6 +198,7 @@ export default function SubscriptionsScreen() {
     setFrequency('monthly');
     setIcon('credit-card');
     setColor('#6200EE');
+    setCategoryId(null);
   };
 
   const getDaysUntilRenewal = (nextBillingDate: string) => {
@@ -242,6 +272,87 @@ export default function SubscriptionsScreen() {
             </View>
           </Card.Content>
         </Card>
+
+        {/* Category Spending with Budgets */}
+        {getCategorySpending().length > 0 && (
+          <Card style={styles.card} mode="elevated">
+            <Card.Content>
+              <View style={styles.categoryHeader}>
+                <Text variant="titleMedium">Spese per categoria</Text>
+                <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                  Tocca per impostare budget
+                </Text>
+              </View>
+              {getCategorySpending().map((catSpending) => {
+                const category = SUBSCRIPTION_CATEGORIES.find((c) => c.id === catSpending.categoryId);
+                if (!category) return null;
+                const percentage = catSpending.budget ? (catSpending.spent / catSpending.budget) * 100 : 0;
+                const isOverBudget = catSpending.budget && catSpending.spent > catSpending.budget;
+
+                return (
+                  <Pressable
+                    key={category.id}
+                    style={styles.categorySpendingItem}
+                    onPress={() => openBudgetModal(category.id)}
+                  >
+                    <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
+                      <MaterialCommunityIcons
+                        name={category.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                        size={20}
+                        color={category.color}
+                      />
+                    </View>
+                    <View style={styles.categorySpendingInfo}>
+                      <View style={styles.categorySpendingHeader}>
+                        <Text variant="bodyMedium">{category.name}</Text>
+                        <Text
+                          variant="titleSmall"
+                          style={{ color: isOverBudget ? brandColors.error : theme.colors.onSurface }}
+                        >
+                          {formatCurrency(catSpending.spent, currency)}/mese
+                        </Text>
+                      </View>
+                      {catSpending.budget ? (
+                        <>
+                          <View style={styles.categoryProgressBar}>
+                            <View
+                              style={[
+                                styles.categoryProgressFill,
+                                {
+                                  width: `${Math.min(percentage, 100)}%`,
+                                  backgroundColor: isOverBudget ? brandColors.error : category.color,
+                                },
+                              ]}
+                            />
+                          </View>
+                          <Text
+                            variant="labelSmall"
+                            style={{
+                              color: isOverBudget ? brandColors.error : theme.colors.onSurfaceVariant,
+                            }}
+                          >
+                            {isOverBudget
+                              ? `Sforato di ${formatCurrency(catSpending.spent - catSpending.budget, currency)}`
+                              : `Budget: ${formatCurrency(catSpending.budget, currency)}`}
+                          </Text>
+                        </>
+                      ) : (
+                        <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                          Nessun budget impostato
+                        </Text>
+                      )}
+                    </View>
+                    <MaterialCommunityIcons
+                      name="chevron-right"
+                      size={20}
+                      color={theme.colors.onSurfaceVariant}
+                    />
+                  </Pressable>
+                );
+              })}
+            </Card.Content>
+          </Card>
+        )}
 
         {/* Upcoming Renewals */}
         {upcomingRenewals.length > 0 && (
@@ -449,7 +560,7 @@ export default function SubscriptionsScreen() {
           </Surface>
         )}
 
-        <View style={{ height: 80 }} />
+        <View style={{ height: 80 + insets.bottom }} />
       </ScrollView>
 
       {/* Gradient FAB */}
@@ -457,6 +568,7 @@ export default function SubscriptionsScreen() {
         onPress={() => setAddModalVisible(true)}
         style={({ pressed }) => [
           styles.fabPressable,
+          { bottom: spacing.md + insets.bottom },
           pressed && styles.fabPressed,
         ]}
       >
@@ -548,6 +660,34 @@ export default function SubscriptionsScreen() {
               style={{ marginBottom: spacing.md }}
             />
 
+            <Text variant="labelLarge" style={{ marginBottom: spacing.sm }}>
+              Categoria
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md }}>
+              {SUBSCRIPTION_CATEGORIES.map((cat) => (
+                <Pressable
+                  key={cat.id}
+                  style={[
+                    styles.categoryChip,
+                    categoryId === cat.id && { borderColor: cat.color, borderWidth: 2 },
+                  ]}
+                  onPress={() => setCategoryId(cat.id)}
+                >
+                  <MaterialCommunityIcons
+                    name={cat.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                    size={18}
+                    color={categoryId === cat.id ? cat.color : theme.colors.onSurfaceVariant}
+                  />
+                  <Text
+                    variant="labelSmall"
+                    style={{ color: categoryId === cat.id ? cat.color : theme.colors.onSurfaceVariant }}
+                  >
+                    {cat.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+
             <View style={styles.modalActions}>
               <Button
                 mode="outlined"
@@ -568,6 +708,78 @@ export default function SubscriptionsScreen() {
               </Button>
             </View>
           </ScrollView>
+        </Modal>
+
+        {/* Budget Modal */}
+        <Modal
+          visible={budgetModalVisible}
+          onDismiss={() => {
+            setBudgetModalVisible(false);
+            setEditingBudgetCategory(null);
+            setBudgetAmount('');
+          }}
+          contentContainerStyle={[styles.budgetModal, { backgroundColor: theme.colors.surface }]}
+        >
+          {editingBudgetCategory && (
+            <>
+              {(() => {
+                const category = SUBSCRIPTION_CATEGORIES.find((c) => c.id === editingBudgetCategory);
+                if (!category) return null;
+                return (
+                  <>
+                    <View style={styles.budgetModalHeader}>
+                      <View style={[styles.categoryIcon, { backgroundColor: category.color + '20' }]}>
+                        <MaterialCommunityIcons
+                          name={category.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                          size={24}
+                          color={category.color}
+                        />
+                      </View>
+                      <Text variant="titleLarge" style={{ marginLeft: spacing.md }}>
+                        Budget {category.name}
+                      </Text>
+                    </View>
+
+                    <TextInput
+                      label="Budget mensile"
+                      value={budgetAmount}
+                      onChangeText={setBudgetAmount}
+                      keyboardType="numeric"
+                      mode="outlined"
+                      style={{ marginTop: spacing.lg }}
+                      left={<TextInput.Icon icon="currency-eur" />}
+                      placeholder="Es: 30"
+                    />
+
+                    <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: spacing.sm }}>
+                      Imposta un budget mensile per questa categoria di abbonamenti.
+                      Riceverai un avviso se lo superi.
+                    </Text>
+
+                    <View style={styles.modalActions}>
+                      <Button
+                        mode="outlined"
+                        onPress={() => {
+                          setBudgetModalVisible(false);
+                          setEditingBudgetCategory(null);
+                          setBudgetAmount('');
+                        }}
+                      >
+                        Annulla
+                      </Button>
+                      <Button
+                        mode="contained"
+                        onPress={handleSaveBudget}
+                        disabled={!budgetAmount}
+                      >
+                        Salva
+                      </Button>
+                    </View>
+                  </>
+                );
+              })()}
+            </>
+          )}
         </Modal>
       </Portal>
     </SafeAreaView>
@@ -680,7 +892,6 @@ const styles = StyleSheet.create({
   fabPressable: {
     position: 'absolute',
     right: spacing.md,
-    bottom: spacing.md,
     borderRadius: 28,
     elevation: 6,
     shadowColor: '#000',
@@ -727,5 +938,63 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: spacing.sm,
     marginTop: spacing.md,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  categorySpendingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  categoryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  categorySpendingInfo: {
+    flex: 1,
+  },
+  categorySpendingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  categoryProgressBar: {
+    height: 6,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 3,
+    marginVertical: 4,
+  },
+  categoryProgressFill: {
+    height: 6,
+    borderRadius: 3,
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    marginRight: spacing.sm,
+    gap: spacing.xs,
+  },
+  budgetModal: {
+    margin: spacing.md,
+    padding: spacing.lg,
+    borderRadius: 12,
+  },
+  budgetModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

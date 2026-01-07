@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { format } from 'date-fns';
+import { format, parseISO, startOfMonth, subMonths } from 'date-fns';
 
 // Simple investment types
 export type InvestmentType = 'etf' | 'stocks' | 'bonds' | 'crypto' | 'real_estate' | 'other';
@@ -17,6 +17,22 @@ export interface Investment {
   lastUpdatedAt: string;
   notes: string | null;
   createdAt: string;
+}
+
+export interface NetWorthSnapshot {
+  date: string;
+  netWorth: number;
+  investments: number;
+  cash: number;
+  debts: number;
+}
+
+export interface Dividend {
+  id: string;
+  investmentId: string;
+  amount: number;
+  date: string;
+  notes: string | null;
 }
 
 export interface InvestmentTransaction {
@@ -43,6 +59,8 @@ interface PatrimonioState {
   investmentTransactions: InvestmentTransaction[];
   bankAccounts: BankAccount[];
   debts: Debt[];
+  netWorthHistory: NetWorthSnapshot[];
+  dividends: Dividend[];
   isLoading: boolean;
 
   // Investment actions
@@ -62,6 +80,18 @@ interface PatrimonioState {
   addDebt: (debt: Omit<Debt, 'id'>) => void;
   updateDebt: (id: string, updates: Partial<Debt>) => void;
   deleteDebt: (id: string) => void;
+
+  // Dividend actions
+  addDividend: (investmentId: string, amount: number, date?: string, notes?: string) => void;
+  deleteDividend: (id: string) => void;
+  getDividendsByInvestment: (investmentId: string) => Dividend[];
+  getTotalDividends: () => number;
+  getDividendsByPeriod: (months: number) => Dividend[];
+
+  // Net worth history actions
+  recordNetWorthSnapshot: () => void;
+  getNetWorthHistory: (months: number) => NetWorthSnapshot[];
+  getNetWorthChange: (months: number) => { absolute: number; percentage: number };
 
   // Calculations
   getTotalInvestments: () => number;
@@ -101,6 +131,8 @@ export const usePatrimonioStore = create<PatrimonioState>()(
       investmentTransactions: [],
       bankAccounts: [],
       debts: [],
+      netWorthHistory: [],
+      dividends: [],
       isLoading: false,
 
       // Investment actions
@@ -308,6 +340,98 @@ export const usePatrimonioStore = create<PatrimonioState>()(
         });
 
         return allocation.sort((a, b) => b.value - a.value);
+      },
+
+      // Dividend actions
+      addDividend: (investmentId, amount, date, notes) => {
+        const dividend: Dividend = {
+          id: Date.now().toString(),
+          investmentId,
+          amount,
+          date: date || format(new Date(), 'yyyy-MM-dd'),
+          notes: notes || null,
+        };
+        set((state) => ({
+          dividends: [...state.dividends, dividend],
+        }));
+      },
+
+      deleteDividend: (id) => {
+        set((state) => ({
+          dividends: state.dividends.filter((d) => d.id !== id),
+        }));
+      },
+
+      getDividendsByInvestment: (investmentId) => {
+        return get().dividends.filter((d) => d.investmentId === investmentId);
+      },
+
+      getTotalDividends: () => {
+        return get().dividends.reduce((sum, d) => sum + d.amount, 0);
+      },
+
+      getDividendsByPeriod: (months) => {
+        const cutoffDate = subMonths(new Date(), months);
+        return get().dividends.filter((d) => parseISO(d.date) >= cutoffDate);
+      },
+
+      // Net worth history actions
+      recordNetWorthSnapshot: () => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const { netWorthHistory, getTotalInvestments, getTotalBankBalance, getTotalDebts, getNetWorth } = get();
+
+        // Check if we already have a snapshot for today
+        const existingToday = netWorthHistory.find((s) => s.date === today);
+        if (existingToday) {
+          // Update today's snapshot
+          set((state) => ({
+            netWorthHistory: state.netWorthHistory.map((s) =>
+              s.date === today
+                ? {
+                    date: today,
+                    netWorth: getNetWorth(),
+                    investments: getTotalInvestments(),
+                    cash: getTotalBankBalance(),
+                    debts: getTotalDebts(),
+                  }
+                : s
+            ),
+          }));
+        } else {
+          // Add new snapshot
+          const snapshot: NetWorthSnapshot = {
+            date: today,
+            netWorth: getNetWorth(),
+            investments: getTotalInvestments(),
+            cash: getTotalBankBalance(),
+            debts: getTotalDebts(),
+          };
+          set((state) => ({
+            netWorthHistory: [...state.netWorthHistory, snapshot].sort((a, b) =>
+              a.date.localeCompare(b.date)
+            ),
+          }));
+        }
+      },
+
+      getNetWorthHistory: (months) => {
+        const cutoffDate = format(subMonths(new Date(), months), 'yyyy-MM-dd');
+        return get().netWorthHistory.filter((s) => s.date >= cutoffDate);
+      },
+
+      getNetWorthChange: (months) => {
+        const history = get().getNetWorthHistory(months);
+        if (history.length < 2) {
+          const currentNetWorth = get().getNetWorth();
+          return { absolute: 0, percentage: 0 };
+        }
+
+        const oldest = history[0];
+        const newest = history[history.length - 1];
+        const absolute = newest.netWorth - oldest.netWorth;
+        const percentage = oldest.netWorth !== 0 ? (absolute / Math.abs(oldest.netWorth)) * 100 : 0;
+
+        return { absolute, percentage };
       },
     }),
     {

@@ -8,3 +8,5 @@ export { useSharedStore } from './sharedStore';
 export { useInsightStore } from './insightStore';
 export { usePremiumStore, useIsPremium, useCanUseFeature, FREE_LIMITS } from './premiumStore';
 export type { PremiumFeature } from './premiumStore';
+export { useEnableBankingStore } from './enableBankingStore';
+export type { SyncStatus } from './enableBankingStore';

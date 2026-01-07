@@ -616,6 +616,163 @@ export interface Database {
           updated_at?: string;
         };
       };
+      enable_banking_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          session_id: string;
+          status: 'pending' | 'authorized' | 'expired' | 'revoked' | 'error';
+          valid_until: string | null;
+          accounts_data: Json | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          session_id: string;
+          status?: 'pending' | 'authorized' | 'expired' | 'revoked' | 'error';
+          valid_until?: string | null;
+          accounts_data?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          session_id?: string;
+          status?: 'pending' | 'authorized' | 'expired' | 'revoked' | 'error';
+          valid_until?: string | null;
+          accounts_data?: Json | null;
+          updated_at?: string;
+        };
+      };
+      enable_banking_accounts: {
+        Row: {
+          id: string;
+          user_id: string;
+          session_id: string;
+          account_id: string;
+          iban: string | null;
+          bban: string | null;
+          account_name: string | null;
+          account_type: string | null;
+          currency: string;
+          balance_amount: number | null;
+          balance_type: string | null;
+          balance_date: string | null;
+          bank_name: string | null;
+          bank_bic: string | null;
+          bank_country: string | null;
+          is_active: boolean;
+          last_sync_at: string | null;
+          sync_status: 'pending' | 'syncing' | 'success' | 'error';
+          sync_error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          session_id: string;
+          account_id: string;
+          iban?: string | null;
+          bban?: string | null;
+          account_name?: string | null;
+          account_type?: string | null;
+          currency?: string;
+          balance_amount?: number | null;
+          balance_type?: string | null;
+          balance_date?: string | null;
+          bank_name?: string | null;
+          bank_bic?: string | null;
+          bank_country?: string | null;
+          is_active?: boolean;
+          last_sync_at?: string | null;
+          sync_status?: 'pending' | 'syncing' | 'success' | 'error';
+          sync_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          account_name?: string | null;
+          account_type?: string | null;
+          currency?: string;
+          balance_amount?: number | null;
+          balance_type?: string | null;
+          balance_date?: string | null;
+          bank_name?: string | null;
+          is_active?: boolean;
+          last_sync_at?: string | null;
+          sync_status?: 'pending' | 'syncing' | 'success' | 'error';
+          sync_error?: string | null;
+          updated_at?: string;
+        };
+      };
+      enable_banking_aspsps: {
+        Row: {
+          id: string;
+          name: string;
+          bic: string | null;
+          country: string;
+          logo_url: string | null;
+          supported_features: Json | null;
+          maximum_consent_validity: string | null;
+          cached_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          bic?: string | null;
+          country: string;
+          logo_url?: string | null;
+          supported_features?: Json | null;
+          maximum_consent_validity?: string | null;
+          cached_at?: string;
+        };
+        Update: {
+          name?: string;
+          bic?: string | null;
+          country?: string;
+          logo_url?: string | null;
+          supported_features?: Json | null;
+          maximum_consent_validity?: string | null;
+          cached_at?: string;
+        };
+      };
+      transaction_category_rules: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          pattern: string;
+          pattern_type: 'contains' | 'starts_with' | 'ends_with' | 'regex' | 'exact';
+          category_id: string;
+          priority: number;
+          is_global: boolean;
+          match_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          pattern: string;
+          pattern_type?: 'contains' | 'starts_with' | 'ends_with' | 'regex' | 'exact';
+          category_id: string;
+          priority?: number;
+          is_global?: boolean;
+          match_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          pattern?: string;
+          pattern_type?: 'contains' | 'starts_with' | 'ends_with' | 'regex' | 'exact';
+          category_id?: string;
+          priority?: number;
+          is_global?: boolean;
+          match_count?: number;
+          updated_at?: string;
+        };
+      };
     };
     Views: {};
     Functions: {};
@@ -653,3 +810,7 @@ export type UserGamification = Tables<'user_gamification'>;
 export type BankAccount = Tables<'bank_accounts'>;
 export type SaltEdgeCustomer = Tables<'saltedge_customers'>;
 export type SaltEdgeConnection = Tables<'saltedge_connections'>;
+export type EnableBankingSession = Tables<'enable_banking_sessions'>;
+export type EnableBankingAccount = Tables<'enable_banking_accounts'>;
+export type EnableBankingASPSP = Tables<'enable_banking_aspsps'>;
+export type TransactionCategoryRule = Tables<'transaction_category_rules'>;

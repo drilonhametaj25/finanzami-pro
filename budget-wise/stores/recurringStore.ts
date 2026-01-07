@@ -7,6 +7,7 @@ interface RecurringState {
   recurringTransactions: RecurringTransaction[];
   isLoading: boolean;
   error: string | null;
+  lastAutoProcessed: string | null;
 
   // Actions
   fetchRecurring: () => Promise<void>;
@@ -14,6 +15,7 @@ interface RecurringState {
   updateRecurring: (id: string, updates: UpdateTables<'recurring_transactions'>) => Promise<{ error: string | null }>;
   deleteRecurring: (id: string) => Promise<{ error: string | null }>;
   markAsPaid: (id: string) => Promise<{ error: string | null }>;
+  processOverdueAutomatically: () => Promise<{ processed: number; errors: string[] }>;
   getUpcoming: (days?: number) => RecurringTransaction[];
   getOverdue: () => RecurringTransaction[];
 }
@@ -43,6 +45,7 @@ export const useRecurringStore = create<RecurringState>((set, get) => ({
   recurringTransactions: [],
   isLoading: false,
   error: null,
+  lastAutoProcessed: null,
 
   fetchRecurring: async () => {
     try {
@@ -214,6 +217,92 @@ export const useRecurringStore = create<RecurringState>((set, get) => ({
       set({ isLoading: false, error: message });
       return { error: message };
     }
+  },
+
+  processOverdueAutomatically: async () => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const { lastAutoProcessed, recurringTransactions } = get();
+
+    // Only process once per day
+    if (lastAutoProcessed === today) {
+      return { processed: 0, errors: [] };
+    }
+
+    const errors: string[] = [];
+    let processed = 0;
+
+    // Get all overdue and due today
+    const overdueItems = recurringTransactions.filter((r) => {
+      const nextDate = parseISO(r.next_date);
+      return isPast(nextDate) || isToday(nextDate);
+    });
+
+    if (overdueItems.length === 0) {
+      set({ lastAutoProcessed: today });
+      return { processed: 0, errors: [] };
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { processed: 0, errors: ['Not authenticated'] };
+    }
+
+    for (const recurring of overdueItems) {
+      try {
+        // Process each overdue date until we catch up to today
+        let currentDate = recurring.next_date;
+        let nextDate = getNextDate(currentDate, recurring.frequency);
+
+        // Keep processing while the current date is in the past or today
+        while (isPast(parseISO(currentDate)) || isToday(parseISO(currentDate))) {
+          // Create the transaction for this date
+          const { error: txError } = await supabase.from('transactions').insert({
+            user_id: user.id,
+            category_id: recurring.category_id,
+            amount: recurring.amount,
+            type: 'expense',
+            description: recurring.description,
+            date: currentDate,
+            is_recurring: true,
+            recurring_id: recurring.id,
+          });
+
+          if (txError) {
+            errors.push(`Failed to create transaction for ${recurring.description}: ${txError.message}`);
+            break;
+          }
+
+          processed++;
+
+          // Move to next occurrence
+          currentDate = nextDate;
+          nextDate = getNextDate(currentDate, recurring.frequency);
+
+          // Safety check: don't process future dates
+          if (!isPast(parseISO(currentDate)) && !isToday(parseISO(currentDate))) {
+            break;
+          }
+        }
+
+        // Update the recurring with the next future date
+        const { error: updateError } = await supabase
+          .from('recurring_transactions')
+          .update({ next_date: currentDate })
+          .eq('id', recurring.id);
+
+        if (updateError) {
+          errors.push(`Failed to update next date for ${recurring.description}: ${updateError.message}`);
+        }
+      } catch (err) {
+        errors.push(`Error processing ${recurring.description}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
+    }
+
+    // Refresh the recurring list
+    await get().fetchRecurring();
+    set({ lastAutoProcessed: today });
+
+    return { processed, errors };
   },
 
   getUpcoming: (days = 7) => {

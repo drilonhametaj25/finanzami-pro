@@ -15,12 +15,15 @@ CREATE TABLE IF NOT EXISTS saltedge_customers (
 ALTER TABLE saltedge_customers ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for saltedge_customers
+DROP POLICY IF EXISTS "Users can view own saltedge customer" ON saltedge_customers;
 CREATE POLICY "Users can view own saltedge customer" ON saltedge_customers
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own saltedge customer" ON saltedge_customers;
 CREATE POLICY "Users can insert own saltedge customer" ON saltedge_customers
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own saltedge customer" ON saltedge_customers;
 CREATE POLICY "Users can delete own saltedge customer" ON saltedge_customers
   FOR DELETE USING (auth.uid() = user_id);
 
@@ -52,15 +55,19 @@ CREATE TABLE IF NOT EXISTS saltedge_connections (
 ALTER TABLE saltedge_connections ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for saltedge_connections
+DROP POLICY IF EXISTS "Users can view own connections" ON saltedge_connections;
 CREATE POLICY "Users can view own connections" ON saltedge_connections
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own connections" ON saltedge_connections;
 CREATE POLICY "Users can insert own connections" ON saltedge_connections
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own connections" ON saltedge_connections;
 CREATE POLICY "Users can update own connections" ON saltedge_connections
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own connections" ON saltedge_connections;
 CREATE POLICY "Users can delete own connections" ON saltedge_connections
   FOR DELETE USING (auth.uid() = user_id);
 

@@ -7,6 +7,7 @@ import {
   Alert,
   Linking,
   Pressable,
+  Platform,
 } from 'react-native';
 import {
   Text,
@@ -168,7 +169,12 @@ export default function PaywallScreen() {
               <View style={styles.premiumActiveButtonContainer}>
                 <Button
                   mode="contained"
-                  onPress={() => Linking.openURL('https://apps.apple.com/account/subscriptions')}
+                  onPress={() => {
+                    const url = Platform.OS === 'ios'
+                      ? 'https://apps.apple.com/account/subscriptions'
+                      : 'https://play.google.com/store/account/subscriptions';
+                    Linking.openURL(url);
+                  }}
                   buttonColor="#FFFFFF"
                   textColor={brandColors.primary}
                   style={styles.manageButton}

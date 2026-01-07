@@ -5,12 +5,14 @@ import { StatusBar } from 'expo-status-bar';
 import { PaperProvider } from 'react-native-paper';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as Linking from 'expo-linking';
 
 import { useAuthStore } from '../stores/authStore';
 import { lightTheme, darkTheme } from '../constants/theme';
 import { useThemeStore } from '../stores/themeStore';
 import { useNotifications } from '../hooks/useNotifications';
 import { CelebrationProvider } from '../components/celebration';
+import { supabase } from '../services/supabase';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -37,6 +39,58 @@ export default function RootLayout() {
       setIsReady(true);
     };
     init();
+  }, [initialize]);
+
+  // Handle deep link for auth (email confirmation, password reset, etc.)
+  useEffect(() => {
+    const handleDeepLink = async (url: string) => {
+      // Check if this is an auth callback URL
+      if (url.includes('access_token') || url.includes('refresh_token') || url.includes('type=')) {
+        try {
+          // Extract tokens from URL fragment
+          const hashPart = url.split('#')[1];
+          if (hashPart) {
+            const params = new URLSearchParams(hashPart);
+            const accessToken = params.get('access_token');
+            const refreshToken = params.get('refresh_token');
+            const type = params.get('type');
+
+            if (accessToken && refreshToken) {
+              // Set the session in Supabase
+              const { error } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
+
+              if (error) {
+                console.error('Error setting session:', error);
+              } else {
+                // Re-initialize to fetch updated user data
+                await initialize();
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error handling deep link:', error);
+        }
+      }
+    };
+
+    // Handle URL when app is opened from a link
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleDeepLink(event.url);
+    });
+
+    // Check if app was opened with a URL
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink(url);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, [initialize]);
 
   // Handle navigation based on auth state

@@ -190,6 +190,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           data: {
             full_name: fullName,
           },
+          emailRedirectTo: 'budgetwise://auth/callback',
         },
       });
 
@@ -267,7 +268,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ isLoading: true, error: null });
 
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'budgetwise://reset-password',
+        redirectTo: 'budgetwise://auth/callback',
       });
 
       set({ isLoading: false });

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import {
   Text,
@@ -16,7 +16,7 @@ import {
   TextInput,
   ProgressBar,
 } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,6 +28,7 @@ import {
   Investment,
   BankAccount,
   Debt,
+  Dividend,
   getInvestmentTypeLabel,
   getInvestmentTypeConfig,
   InvestmentType,
@@ -51,6 +52,7 @@ const INVESTMENT_TYPES: { type: InvestmentType; label: string }[] = [
 
 export default function PatrimonioScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { profile } = useAuthStore();
   const { canUseFeature } = usePremiumStore();
 
@@ -87,6 +89,7 @@ export default function PatrimonioScreen() {
     investments,
     bankAccounts,
     debts,
+    dividends,
     addInvestment,
     updateInvestment,
     deleteInvestment,
@@ -98,6 +101,13 @@ export default function PatrimonioScreen() {
     addDebt,
     updateDebt,
     deleteDebt,
+    addDividend,
+    deleteDividend,
+    getTotalDividends,
+    getDividendsByPeriod,
+    recordNetWorthSnapshot,
+    getNetWorthHistory,
+    getNetWorthChange,
     getTotalInvestments,
     getTotalInvested,
     getInvestmentPerformance,
@@ -133,7 +143,22 @@ export default function PatrimonioScreen() {
 
   const [fundsAmount, setFundsAmount] = useState('');
 
+  // Dividend modal
+  const [addDividendModal, setAddDividendModal] = useState<Investment | null>(null);
+  const [dividendAmount, setDividendAmount] = useState('');
+  const [dividendDate, setDividendDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+
+  // History period
+  const [historyPeriod, setHistoryPeriod] = useState<number>(6);
+
   const currency = profile?.main_currency || 'EUR';
+
+  // Record snapshot on mount/data change
+  useEffect(() => {
+    if (investments.length > 0 || bankAccounts.length > 0 || debts.length > 0) {
+      recordNetWorthSnapshot();
+    }
+  }, [investments, bankAccounts, debts, recordNetWorthSnapshot]);
 
   const totalInvestments = getTotalInvestments();
   const totalInvested = getTotalInvested();
@@ -142,6 +167,21 @@ export default function PatrimonioScreen() {
   const totalDebts = getTotalDebts();
   const netWorth = getNetWorth();
   const allocation = getAssetAllocation();
+  const netWorthHistory = getNetWorthHistory(historyPeriod);
+  const netWorthChange = getNetWorthChange(historyPeriod);
+  const totalDividends = getTotalDividends();
+  const recentDividends = getDividendsByPeriod(12);
+
+  // Handle add dividend
+  const handleAddDividend = () => {
+    if (!addDividendModal || !dividendAmount) return;
+    const amount = parseFloat(dividendAmount);
+    if (isNaN(amount) || amount <= 0) return;
+    addDividend(addDividendModal.id, amount, dividendDate);
+    setAddDividendModal(null);
+    setDividendAmount('');
+    setDividendDate(format(new Date(), 'yyyy-MM-dd'));
+  };
 
   // Allocation colors
   const allocationColors = [
@@ -286,6 +326,146 @@ export default function PatrimonioScreen() {
             </View>
           </Card.Content>
         </Card>
+
+        {/* Net Worth History & Change */}
+        {netWorthHistory.length > 0 && (
+          <Card style={styles.card} mode="elevated">
+            <Card.Content>
+              <View style={styles.historyHeader}>
+                <Text variant="titleMedium">Andamento Patrimonio</Text>
+                <View style={styles.periodSelector}>
+                  {[3, 6, 12].map((months) => (
+                    <Chip
+                      key={months}
+                      selected={historyPeriod === months}
+                      onPress={() => setHistoryPeriod(months)}
+                      style={{ marginLeft: spacing.xs }}
+                      compact
+                    >
+                      {months}m
+                    </Chip>
+                  ))}
+                </View>
+              </View>
+
+              {/* Change indicator */}
+              <View style={styles.changeIndicator}>
+                <MaterialCommunityIcons
+                  name={netWorthChange.absolute >= 0 ? 'trending-up' : 'trending-down'}
+                  size={32}
+                  color={netWorthChange.absolute >= 0 ? brandColors.success : brandColors.error}
+                />
+                <View style={{ marginLeft: spacing.md }}>
+                  <Text
+                    variant="headlineSmall"
+                    style={{
+                      fontWeight: 'bold',
+                      color: netWorthChange.absolute >= 0 ? brandColors.success : brandColors.error,
+                    }}
+                  >
+                    {netWorthChange.absolute >= 0 ? '+' : ''}
+                    {formatCurrency(netWorthChange.absolute, currency)}
+                  </Text>
+                  <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+                    {netWorthChange.percentage >= 0 ? '+' : ''}
+                    {netWorthChange.percentage.toFixed(1)}% negli ultimi {historyPeriod} mesi
+                  </Text>
+                </View>
+              </View>
+
+              {/* Simple line chart representation */}
+              <View style={styles.historyChart}>
+                {netWorthHistory.length >= 2 && (
+                  <View style={styles.chartContainer}>
+                    {netWorthHistory.map((snapshot, idx) => {
+                      const maxValue = Math.max(...netWorthHistory.map((s) => Math.abs(s.netWorth)));
+                      const height = maxValue > 0 ? (Math.abs(snapshot.netWorth) / maxValue) * 80 : 0;
+                      const isPositive = snapshot.netWorth >= 0;
+
+                      return (
+                        <View key={snapshot.date} style={styles.chartBar}>
+                          <View
+                            style={[
+                              styles.chartBarFill,
+                              {
+                                height,
+                                backgroundColor: isPositive ? brandColors.success : brandColors.error,
+                              },
+                            ]}
+                          />
+                          <Text variant="labelSmall" style={styles.chartLabel}>
+                            {format(new Date(snapshot.date), 'MMM', { locale: it })}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            </Card.Content>
+          </Card>
+        )}
+
+        {/* Dividends Section */}
+        {investments.length > 0 && (
+          <Card style={styles.card} mode="elevated">
+            <Card.Content>
+              <View style={styles.dividendsHeader}>
+                <View>
+                  <Text variant="titleMedium">Dividendi</Text>
+                  <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                    Totale: {formatCurrency(totalDividends, currency)}
+                  </Text>
+                </View>
+                <Text
+                  variant="headlineSmall"
+                  style={{ fontWeight: 'bold', color: brandColors.success }}
+                >
+                  +{formatCurrency(recentDividends.reduce((sum, d) => sum + d.amount, 0), currency)}
+                  <Text variant="labelSmall"> /anno</Text>
+                </Text>
+              </View>
+
+              {recentDividends.length > 0 ? (
+                <View style={styles.dividendsList}>
+                  {recentDividends.slice(0, 5).map((dividend) => {
+                    const investment = investments.find((i) => i.id === dividend.investmentId);
+                    return (
+                      <View key={dividend.id} style={styles.dividendItem}>
+                        <View style={[styles.dividendIcon, { backgroundColor: brandColors.success + '20' }]}>
+                          <MaterialCommunityIcons name="cash-plus" size={18} color={brandColors.success} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text variant="bodyMedium">{investment?.name || 'Investimento'}</Text>
+                          <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                            {format(new Date(dividend.date), 'd MMM yyyy', { locale: it })}
+                          </Text>
+                        </View>
+                        <Text variant="titleSmall" style={{ fontWeight: 'bold', color: brandColors.success }}>
+                          +{formatCurrency(dividend.amount, currency)}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View style={styles.emptyDividends}>
+                  <MaterialCommunityIcons
+                    name="cash-multiple"
+                    size={40}
+                    color={theme.colors.onSurfaceVariant}
+                  />
+                  <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: spacing.sm }}>
+                    Nessun dividendo registrato
+                  </Text>
+                  <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                    Aggiungi dividendi dal menu di ogni investimento
+                  </Text>
+                </View>
+              )}
+            </Card.Content>
+          </Card>
+        )}
 
         {/* Asset Allocation */}
         {allocation.length > 0 && (
@@ -457,6 +637,14 @@ export default function PatrimonioScreen() {
                         title="Aggiungi fondi"
                       />
                       <Menu.Item
+                        leadingIcon="cash-plus"
+                        onPress={() => {
+                          setAddDividendModal(inv);
+                          setMenuVisible(null);
+                        }}
+                        title="Aggiungi dividendo"
+                      />
+                      <Menu.Item
                         leadingIcon="refresh"
                         onPress={() => {
                           // Would open value update modal
@@ -600,7 +788,7 @@ export default function PatrimonioScreen() {
           </Surface>
         )}
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 100 + insets.bottom }} />
       </ScrollView>
 
       {/* Gradient FAB */}
@@ -608,6 +796,7 @@ export default function PatrimonioScreen() {
         onPress={() => setFabOpen(!fabOpen)}
         style={({ pressed }) => [
           styles.fabPressable,
+          { bottom: spacing.md + insets.bottom },
           pressed && styles.fabPressed,
         ]}
       >
@@ -623,7 +812,7 @@ export default function PatrimonioScreen() {
 
       {/* FAB Actions */}
       {fabOpen && (
-        <View style={styles.fabActions}>
+        <View style={[styles.fabActions, { bottom: 80 + insets.bottom }]}>
           <Pressable onPress={() => { setAddInvestmentModal(true); setFabOpen(false); }} style={styles.fabActionItem}>
             <View style={[styles.fabActionIcon, { backgroundColor: '#4CAF50' }]}>
               <MaterialCommunityIcons name="chart-line" size={20} color="#FFFFFF" />
@@ -879,6 +1068,61 @@ export default function PatrimonioScreen() {
           </View>
         </Modal>
       </Portal>
+
+      {/* Add Dividend Modal */}
+      <Portal>
+        <Modal
+          visible={addDividendModal !== null}
+          onDismiss={() => {
+            setAddDividendModal(null);
+            setDividendAmount('');
+          }}
+          contentContainerStyle={[styles.modal, { backgroundColor: theme.colors.surface }]}
+        >
+          <Text variant="titleLarge" style={{ marginBottom: spacing.lg }}>
+            Aggiungi dividendo per {addDividendModal?.name}
+          </Text>
+
+          <TextInput
+            label="Importo dividendo (€)"
+            value={dividendAmount}
+            onChangeText={setDividendAmount}
+            keyboardType="numeric"
+            mode="outlined"
+            style={styles.input}
+            left={<TextInput.Icon icon="cash-plus" />}
+          />
+
+          <TextInput
+            label="Data"
+            value={dividendDate}
+            onChangeText={setDividendDate}
+            mode="outlined"
+            style={styles.input}
+            left={<TextInput.Icon icon="calendar" />}
+            placeholder="YYYY-MM-DD"
+          />
+
+          <View style={styles.modalActions}>
+            <Button
+              mode="outlined"
+              onPress={() => {
+                setAddDividendModal(null);
+                setDividendAmount('');
+              }}
+            >
+              Annulla
+            </Button>
+            <Button
+              mode="contained"
+              onPress={handleAddDividend}
+              disabled={!dividendAmount}
+            >
+              Aggiungi
+            </Button>
+          </View>
+        </Modal>
+      </Portal>
     </SafeAreaView>
   );
 }
@@ -1021,7 +1265,6 @@ const styles = StyleSheet.create({
   fabPressable: {
     position: 'absolute',
     right: spacing.md,
-    bottom: spacing.md,
     borderRadius: 28,
     elevation: 6,
     shadowColor: '#000',
@@ -1043,7 +1286,6 @@ const styles = StyleSheet.create({
   fabActions: {
     position: 'absolute',
     right: spacing.md,
-    bottom: 80,
     alignItems: 'flex-end',
     gap: spacing.sm,
   },
@@ -1082,5 +1324,73 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: spacing.sm,
     marginTop: spacing.md,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  periodSelector: {
+    flexDirection: 'row',
+  },
+  changeIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    marginBottom: spacing.md,
+  },
+  historyChart: {
+    marginTop: spacing.sm,
+  },
+  chartContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-around',
+    height: 100,
+    paddingTop: spacing.md,
+  },
+  chartBar: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  chartBarFill: {
+    width: 20,
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  chartLabel: {
+    color: '#9E9E9E',
+    fontSize: 10,
+  },
+  dividendsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  dividendsList: {
+    marginTop: spacing.sm,
+  },
+  dividendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  dividendIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  emptyDividends: {
+    alignItems: 'center',
+    padding: spacing.lg,
   },
 });

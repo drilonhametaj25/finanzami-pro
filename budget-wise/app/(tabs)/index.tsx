@@ -14,8 +14,8 @@ import {
   TextInput,
   Snackbar,
 } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { format, startOfMonth, endOfMonth, parseISO, isWithinInterval } from 'date-fns';
@@ -26,6 +26,7 @@ import { useTransactionStore } from '../../stores/transactionStore';
 import { useCategoryStore } from '../../stores/categoryStore';
 import { useInsightStore } from '../../stores/insightStore';
 import { useGoalStore } from '../../stores/goalStore';
+import { useRecurringStore } from '../../stores/recurringStore';
 import { spacing, borderRadius, brandColors, budgetStatusColors } from '../../constants/theme';
 import { formatCurrency } from '../../constants/currencies';
 import { useCelebration } from '../../components/celebration';
@@ -34,19 +35,16 @@ import { GradientFAB } from '../../components/ui';
 export default function DashboardScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { profile } = useAuthStore();
   const { transactions, fetchTransactions, getMonthlyStats } = useTransactionStore();
   const { categories, fetchCategories } = useCategoryStore();
   const { insights, fetchInsights, getHighPriorityInsights, getUnreadCount } = useInsightStore();
   const { goals, fetchGoals, addToGoal } = useGoalStore();
+  const { fetchRecurring, processOverdueAutomatically } = useRecurringStore();
   const { showGoalComplete } = useCelebration();
 
   const [refreshing, setRefreshing] = useState(false);
-  const [monthlyStats, setMonthlyStats] = useState({
-    income: 0,
-    expenses: 0,
-    balance: 0,
-  });
 
   // Goal quick-add modal state
   const [showGoalAddModal, setShowGoalAddModal] = useState(false);
@@ -57,6 +55,33 @@ export default function DashboardScreen() {
 
   const currency = profile?.main_currency || 'EUR';
   const monthlyBudget = profile?.monthly_budget || 0;
+
+  // Calculate monthly stats with useMemo so it updates when transactions change
+  const monthlyStats = useMemo(() => {
+    const now = new Date();
+    const start = startOfMonth(now);
+    const end = endOfMonth(now);
+
+    const monthTransactions = transactions.filter((t) => {
+      const date = new Date(t.date);
+      return date >= start && date <= end;
+    });
+
+    const income = monthTransactions
+      .filter((t) => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const expenses = monthTransactions
+      .filter((t) => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    return {
+      income,
+      expenses,
+      balance: income - expenses,
+    };
+  }, [transactions]);
+
   const budgetPercentage = monthlyBudget > 0 ? (monthlyStats.expenses / monthlyBudget) : 0;
   const budgetRemaining = monthlyBudget - monthlyStats.expenses;
 
@@ -74,6 +99,11 @@ export default function DashboardScreen() {
     const start = startOfMonth(now);
     const end = endOfMonth(now);
 
+    // First, fetch recurring and process any overdue ones automatically
+    await fetchRecurring();
+    await processOverdueAutomatically();
+
+    // Then fetch all data (transactions will include any newly created from recurring)
     await Promise.all([
       fetchTransactions({
         startDate: format(start, 'yyyy-MM-dd'),
@@ -83,14 +113,14 @@ export default function DashboardScreen() {
       fetchInsights(),
       fetchGoals(),
     ]);
+  }, [fetchTransactions, fetchCategories, fetchInsights, fetchGoals, fetchRecurring, processOverdueAutomatically]);
 
-    const stats = getMonthlyStats(now);
-    setMonthlyStats(stats);
-  }, [fetchTransactions, fetchCategories, fetchInsights, fetchGoals, getMonthlyStats]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  // Reload data every time the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -230,7 +260,7 @@ export default function DashboardScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 + insets.bottom }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -674,7 +704,7 @@ export default function DashboardScreen() {
       </ScrollView>
 
       {/* Gradient FAB */}
-      <View style={styles.fabContainer}>
+      <View style={[styles.fabContainer, { bottom: spacing.md + insets.bottom }]}>
         <GradientFAB
           icon="plus"
           onPress={() => router.push('/transaction/add')}
@@ -781,7 +811,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: spacing.md,
-    paddingBottom: 100,
   },
   header: {
     flexDirection: 'row',

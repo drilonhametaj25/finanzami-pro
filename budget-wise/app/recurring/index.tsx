@@ -10,7 +10,7 @@ import {
   Portal,
   Dialog,
 } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,6 +26,7 @@ import { RecurringTransaction } from '../../types/database';
 export default function RecurringListScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { profile } = useAuthStore();
   const {
     recurringTransactions,
@@ -383,6 +384,7 @@ export default function RecurringListScreen() {
           onPress={() => router.push('/recurring/add')}
           style={({ pressed }) => [
             styles.fabPressable,
+            { bottom: spacing.md + insets.bottom },
             pressed && styles.fabPressed,
           ]}
         >
@@ -603,7 +605,6 @@ const styles = StyleSheet.create({
   fabPressable: {
     position: 'absolute',
     right: spacing.md,
-    bottom: spacing.md,
     borderRadius: 28,
     elevation: 6,
     shadowColor: '#000',

@@ -14,7 +14,7 @@ import {
   Divider,
   TextInput,
 } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format, parseISO, isToday, isYesterday, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfYear, endOfYear, subMonths, addMonths, parse, isValid } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -38,6 +38,7 @@ const screenWidth = Dimensions.get('window').width;
 export default function TransactionsScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { profile } = useAuthStore();
   const { transactions, fetchTransactions, loadMore, isLoading, hasMore } = useTransactionStore();
   const { categories, fetchCategories } = useCategoryStore();
@@ -481,7 +482,7 @@ export default function TransactionsScreen() {
         </View>
 
         {/* Bottom spacing for FAB */}
-        <View style={{ height: 100 }} />
+        <View style={{ height: 100 + insets.bottom }} />
       </ScrollView>
 
       {/* Gradient FAB */}
@@ -489,6 +490,7 @@ export default function TransactionsScreen() {
         onPress={() => router.push('/transaction/add')}
         style={({ pressed }) => [
           styles.fabPressable,
+          { bottom: spacing.md + insets.bottom },
           pressed && styles.fabPressed,
         ]}
       >
@@ -799,7 +801,6 @@ const styles = StyleSheet.create({
   fabPressable: {
     position: 'absolute',
     right: spacing.md,
-    bottom: spacing.md,
     borderRadius: 28,
     elevation: 6,
     shadowColor: '#000',

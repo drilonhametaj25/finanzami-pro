@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
 import {
   Text,
   Card,
@@ -10,12 +10,18 @@ import {
   SegmentedButtons,
   Divider,
   Chip,
+  IconButton,
+  Portal,
+  Modal,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { format, parseISO } from 'date-fns';
+import { it } from 'date-fns/locale';
 
 import { useTransactionStore } from '../../stores/transactionStore';
 import { useGoalStore } from '../../stores/goalStore';
 import { useAuthStore } from '../../stores/authStore';
+import { useScenarioStore, SavedScenario } from '../../stores/scenarioStore';
 import { spacing, brandColors } from '../../constants/theme';
 import { formatCurrency } from '../../constants/currencies';
 
@@ -60,11 +66,25 @@ export default function SimulatorScreen() {
   const { profile } = useAuthStore();
   const { transactions } = useTransactionStore();
   const { goals } = useGoalStore();
+  const {
+    savedScenarios,
+    comparisonScenarios,
+    saveScenario,
+    deleteScenario,
+    addToComparison,
+    removeFromComparison,
+    clearComparison,
+    getComparisonScenarios,
+  } = useScenarioStore();
 
   const [selectedScenario, setSelectedScenario] = useState<ScenarioType>('save_more');
   const [amount, setAmount] = useState('');
   const [months, setMonths] = useState('12');
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [scenarioName, setScenarioName] = useState('');
+  const [showSavedScenarios, setShowSavedScenarios] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
 
   const currency = profile?.main_currency || 'EUR';
 
@@ -247,6 +267,52 @@ export default function SimulatorScreen() {
         return { title: '', metrics: [], insight: '' };
     }
   }, [selectedScenario, amount, months, selectedGoal, currentStats, currency]);
+
+  const handleSaveScenario = () => {
+    if (!scenarioName.trim() || parseFloat(amount) <= 0) return;
+
+    saveScenario({
+      name: scenarioName.trim(),
+      type: selectedScenario,
+      amount: parseFloat(amount),
+      months: parseInt(months, 10),
+      goalId: selectedGoalId || undefined,
+      goalName: selectedGoal?.name,
+      results: simulationResults,
+    });
+
+    setSaveModalVisible(false);
+    setScenarioName('');
+    Alert.alert('Salvato!', 'Lo scenario è stato salvato con successo.');
+  };
+
+  const handleDeleteScenario = (id: string) => {
+    Alert.alert(
+      'Elimina scenario',
+      'Sei sicuro di voler eliminare questo scenario?',
+      [
+        { text: 'Annulla', style: 'cancel' },
+        { text: 'Elimina', style: 'destructive', onPress: () => deleteScenario(id) },
+      ]
+    );
+  };
+
+  const loadScenario = (scenario: SavedScenario) => {
+    setSelectedScenario(scenario.type);
+    setAmount(scenario.amount.toString());
+    setMonths(scenario.months.toString());
+    if (scenario.goalId) {
+      setSelectedGoalId(scenario.goalId);
+    }
+    setShowSavedScenarios(false);
+  };
+
+  const comparisonData = getComparisonScenarios();
+
+  const getScenarioIcon = (type: ScenarioType) => {
+    const scenario = SCENARIOS.find((s) => s.type === type);
+    return scenario?.icon || 'calculator';
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -462,6 +528,171 @@ export default function SimulatorScreen() {
                   {simulationResults.insight}
                 </Text>
               </Surface>
+
+              {/* Action buttons */}
+              <View style={styles.actionButtons}>
+                <Button
+                  mode="contained"
+                  icon="content-save"
+                  onPress={() => setSaveModalVisible(true)}
+                  style={{ flex: 1, marginRight: spacing.sm }}
+                >
+                  Salva scenario
+                </Button>
+                <Button
+                  mode="outlined"
+                  icon="compare"
+                  onPress={() => {
+                    addToComparison('current');
+                    setShowComparison(true);
+                  }}
+                >
+                  Confronta
+                </Button>
+              </View>
+            </Card.Content>
+          </Card>
+        )}
+
+        {/* Saved Scenarios Quick Access */}
+        {savedScenarios.length > 0 && (
+          <Card style={styles.card} mode="elevated">
+            <Card.Content>
+              <Pressable
+                style={styles.savedScenariosHeader}
+                onPress={() => setShowSavedScenarios(!showSavedScenarios)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <MaterialCommunityIcons name="bookmark-multiple" size={24} color={theme.colors.primary} />
+                  <Text variant="titleMedium" style={{ marginLeft: spacing.sm }}>
+                    Scenari salvati ({savedScenarios.length})
+                  </Text>
+                </View>
+                <MaterialCommunityIcons
+                  name={showSavedScenarios ? 'chevron-up' : 'chevron-down'}
+                  size={24}
+                  color={theme.colors.onSurfaceVariant}
+                />
+              </Pressable>
+
+              {showSavedScenarios && (
+                <View style={styles.savedScenariosList}>
+                  {savedScenarios.map((scenario) => (
+                    <Surface key={scenario.id} style={styles.savedScenarioItem} elevation={1}>
+                      <Pressable
+                        style={styles.savedScenarioContent}
+                        onPress={() => loadScenario(scenario)}
+                      >
+                        <View style={styles.savedScenarioIcon}>
+                          <MaterialCommunityIcons
+                            name={getScenarioIcon(scenario.type) as keyof typeof MaterialCommunityIcons.glyphMap}
+                            size={20}
+                            color={theme.colors.primary}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text variant="bodyMedium" style={{ fontWeight: 'bold' }}>
+                            {scenario.name}
+                          </Text>
+                          <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                            {formatCurrency(scenario.amount, currency)}/mese • {scenario.months} mesi
+                          </Text>
+                        </View>
+                      </Pressable>
+                      <View style={styles.savedScenarioActions}>
+                        <IconButton
+                          icon={comparisonScenarios.includes(scenario.id) ? 'compare-remove' : 'compare'}
+                          size={18}
+                          onPress={() =>
+                            comparisonScenarios.includes(scenario.id)
+                              ? removeFromComparison(scenario.id)
+                              : addToComparison(scenario.id)
+                          }
+                        />
+                        <IconButton
+                          icon="delete"
+                          size={18}
+                          onPress={() => handleDeleteScenario(scenario.id)}
+                        />
+                      </View>
+                    </Surface>
+                  ))}
+
+                  {comparisonScenarios.length >= 2 && (
+                    <Button
+                      mode="contained"
+                      icon="compare"
+                      onPress={() => setShowComparison(true)}
+                      style={{ marginTop: spacing.md }}
+                    >
+                      Confronta {comparisonScenarios.length} scenari
+                    </Button>
+                  )}
+                </View>
+              )}
+            </Card.Content>
+          </Card>
+        )}
+
+        {/* Comparison View */}
+        {showComparison && comparisonData.length >= 1 && (
+          <Card style={[styles.card, { borderColor: theme.colors.primary, borderWidth: 2 }]} mode="elevated">
+            <Card.Content>
+              <View style={styles.comparisonHeader}>
+                <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
+                  Confronto scenari
+                </Text>
+                <IconButton icon="close" size={20} onPress={() => setShowComparison(false)} />
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {comparisonData.map((scenario, idx) => (
+                  <Surface key={scenario.id} style={styles.comparisonCard} elevation={1}>
+                    <View style={styles.comparisonCardHeader}>
+                      <MaterialCommunityIcons
+                        name={getScenarioIcon(scenario.type) as keyof typeof MaterialCommunityIcons.glyphMap}
+                        size={24}
+                        color={brandColors.primary}
+                      />
+                      <Text variant="titleSmall" style={{ marginLeft: 8, flex: 1 }} numberOfLines={1}>
+                        {scenario.name}
+                      </Text>
+                    </View>
+
+                    <Divider style={{ marginVertical: spacing.sm }} />
+
+                    {scenario.results.metrics.slice(0, 3).map((metric, i) => (
+                      <View key={i} style={styles.comparisonMetric}>
+                        <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                          {metric.label}
+                        </Text>
+                        <Text
+                          variant="titleSmall"
+                          style={{
+                            fontWeight: 'bold',
+                            color: metric.positive ? brandColors.success : brandColors.error,
+                          }}
+                        >
+                          {typeof metric.new === 'number' && metric.label.includes('Mesi')
+                            ? metric.new
+                            : formatCurrency(metric.new, currency)}
+                        </Text>
+                      </View>
+                    ))}
+                  </Surface>
+                ))}
+              </ScrollView>
+
+              <Button
+                mode="text"
+                onPress={() => {
+                  clearComparison();
+                  setShowComparison(false);
+                }}
+                style={{ marginTop: spacing.sm }}
+              >
+                Cancella confronto
+              </Button>
             </Card.Content>
           </Card>
         )}
@@ -483,6 +714,64 @@ export default function SimulatorScreen() {
           </Surface>
         )}
       </ScrollView>
+
+      {/* Save Scenario Modal */}
+      <Portal>
+        <Modal
+          visible={saveModalVisible}
+          onDismiss={() => {
+            setSaveModalVisible(false);
+            setScenarioName('');
+          }}
+          contentContainerStyle={[styles.modal, { backgroundColor: theme.colors.surface }]}
+        >
+          <Text variant="titleLarge" style={{ marginBottom: spacing.lg }}>
+            Salva scenario
+          </Text>
+
+          <TextInput
+            label="Nome scenario"
+            value={scenarioName}
+            onChangeText={setScenarioName}
+            mode="outlined"
+            placeholder="Es: Piano risparmio vacanze"
+            style={{ marginBottom: spacing.md }}
+          />
+
+          <View style={styles.saveModalPreview}>
+            <MaterialCommunityIcons
+              name={getScenarioIcon(selectedScenario) as keyof typeof MaterialCommunityIcons.glyphMap}
+              size={24}
+              color={theme.colors.primary}
+            />
+            <View style={{ marginLeft: spacing.md }}>
+              <Text variant="bodyMedium">{simulationResults.title}</Text>
+              <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                {months} mesi • {simulationResults.metrics.length} metriche
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.modalActions}>
+            <Button
+              mode="outlined"
+              onPress={() => {
+                setSaveModalVisible(false);
+                setScenarioName('');
+              }}
+            >
+              Annulla
+            </Button>
+            <Button
+              mode="contained"
+              onPress={handleSaveScenario}
+              disabled={!scenarioName.trim()}
+            >
+              Salva
+            </Button>
+          </View>
+        </Modal>
+      </Portal>
     </View>
   );
 }
@@ -566,5 +855,80 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.xl,
     borderRadius: 12,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    marginTop: spacing.lg,
+  },
+  savedScenariosHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  savedScenariosList: {
+    marginTop: spacing.md,
+  },
+  savedScenarioItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    marginBottom: spacing.sm,
+    overflow: 'hidden',
+  },
+  savedScenarioContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+  },
+  savedScenarioIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  savedScenarioActions: {
+    flexDirection: 'row',
+  },
+  comparisonHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  comparisonCard: {
+    width: 200,
+    padding: spacing.md,
+    borderRadius: 12,
+    marginRight: spacing.md,
+  },
+  comparisonCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  comparisonMetric: {
+    marginBottom: spacing.sm,
+  },
+  modal: {
+    margin: spacing.md,
+    padding: spacing.lg,
+    borderRadius: 12,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  saveModalPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    marginBottom: spacing.md,
   },
 });

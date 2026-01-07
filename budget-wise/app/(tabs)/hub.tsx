@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import {
   Text,
@@ -47,6 +47,9 @@ export default function HubTabScreen() {
     monthlyChallenge,
   } = useGamificationStore();
   const { checkAndCelebrate } = useAchievementCheck();
+
+  // Track if we've already checked achievements this session
+  const hasCheckedAchievementsRef = useRef(false);
 
   const currency = profile?.main_currency || 'EUR';
   const stats = getStats();
@@ -105,25 +108,29 @@ export default function HubTabScreen() {
 
     calculateHealthScore(healthInput);
 
-    // Check achievements
-    const achievementStats = {
-      totalTransactions: transactions.length,
-      totalIncome: monthlyStats.income,
-      totalExpenses: monthlyStats.expenses,
-      savingsRate: monthlyStats.savingsRate,
-      currentStreak: stats.streak,
-      longestStreak: stats.longestStreak,
-      goalsCompleted: goals.filter((g) => g.is_completed).length,
-      goalsTotal: goals.length,
-      monthsUnderBudget: 0,
-      categoriesWithBudget: categories.filter((c) => c.budget && c.budget > 0).length,
-      totalSaved: goals.reduce((sum, g) => sum + g.current_amount, 0),
-      investmentTotal: getTotalInvestments(),
-      subscriptionsManaged: 0,
-      daysActive: stats.streak,
-    };
+    // Only check achievements once per session to avoid annoying repeated animations
+    if (!hasCheckedAchievementsRef.current && transactions.length > 0) {
+      hasCheckedAchievementsRef.current = true;
 
-    checkAndCelebrate(achievementStats);
+      const achievementStats = {
+        totalTransactions: transactions.length,
+        totalIncome: monthlyStats.income,
+        totalExpenses: monthlyStats.expenses,
+        savingsRate: monthlyStats.savingsRate,
+        currentStreak: stats.streak,
+        longestStreak: stats.longestStreak,
+        goalsCompleted: goals.filter((g) => g.is_completed).length,
+        goalsTotal: goals.length,
+        monthsUnderBudget: 0,
+        categoriesWithBudget: categories.filter((c) => c.budget && c.budget > 0).length,
+        totalSaved: goals.reduce((sum, g) => sum + g.current_amount, 0),
+        investmentTotal: getTotalInvestments(),
+        subscriptionsManaged: 0,
+        daysActive: stats.streak,
+      };
+
+      checkAndCelebrate(achievementStats);
+    }
   }, [transactions, goals]);
 
   // Health score color

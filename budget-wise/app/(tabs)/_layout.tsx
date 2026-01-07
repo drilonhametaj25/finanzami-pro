@@ -10,8 +10,9 @@ export default function TabsLayout() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
-  // Calculate proper tab bar height with safe area - more compact on devices without notch
-  const bottomPadding = Platform.OS === 'ios' ? Math.max(insets.bottom, 4) : 4;
+  // Calculate proper tab bar height with safe area
+  // Su Android usa gli insets per rispettare la navigation bar del sistema (3 pulsanti)
+  const bottomPadding = Math.max(insets.bottom, 4);
   const tabBarHeight = 56 + bottomPadding;
 
   return (

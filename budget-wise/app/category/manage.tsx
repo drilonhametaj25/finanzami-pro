@@ -16,7 +16,7 @@ import {
   SegmentedButtons,
 } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { spacing, borderRadius, brandColors } from '../../constants/theme';
@@ -37,6 +37,7 @@ const AVAILABLE_COLORS = [
 
 export default function CategoryManageScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { categories, isLoading, fetchCategories, updateCategory, createCategory, deleteCategory } = useCategoryStore();
   const { transactions, fetchTransactions } = useTransactionStore();
 
@@ -412,7 +413,7 @@ export default function CategoryManageScreen() {
             );
           })}
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 100 + insets.bottom }} />
       </ScrollView>
 
       {/* Gradient FAB for adding new category */}
@@ -420,6 +421,7 @@ export default function CategoryManageScreen() {
         onPress={handleAddCategory}
         style={({ pressed }) => [
           styles.fabPressable,
+          { bottom: spacing.md + insets.bottom },
           pressed && styles.fabPressed,
         ]}
       >
@@ -933,7 +935,6 @@ const styles = StyleSheet.create({
   fabPressable: {
     position: 'absolute',
     right: spacing.md,
-    bottom: spacing.md,
     borderRadius: borderRadius.xl,
     elevation: 6,
     shadowColor: '#000',

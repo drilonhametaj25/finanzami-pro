@@ -9,7 +9,7 @@ import {
   Button,
   Chip,
 } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,6 +26,7 @@ import { Goal } from '../../types/database';
 export default function GoalsScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { profile } = useAuthStore();
   const { goals, fetchGoals, isLoading } = useGoalStore();
   const { isPremium, getFeatureLimits } = usePremiumStore();
@@ -179,7 +180,7 @@ export default function GoalsScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 + insets.bottom }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -312,6 +313,7 @@ export default function GoalsScreen() {
           onPress={handleAddGoal}
           style={({ pressed }) => [
             styles.fabPressable,
+            { bottom: spacing.md + insets.bottom },
             pressed && styles.fabPressed,
           ]}
         >
@@ -332,7 +334,7 @@ export default function GoalsScreen() {
 
       {/* Free limit indicator */}
       {!isPremium && goals.length > 0 && (
-        <View style={styles.limitIndicator}>
+        <View style={[styles.limitIndicator, { bottom: spacing.md + insets.bottom }]}>
           <Chip
             icon={canAddGoal ? 'target' : 'lock'}
             onPress={() => !canAddGoal && router.push('/premium')}
@@ -352,7 +354,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: spacing.md,
-    paddingBottom: 100,
   },
   // Gradient Header
   headerGradient: {
@@ -505,7 +506,6 @@ const styles = StyleSheet.create({
   fabPressable: {
     position: 'absolute',
     right: spacing.md,
-    bottom: spacing.md,
     borderRadius: 28,
     elevation: 6,
     shadowColor: '#000',
@@ -527,6 +527,5 @@ const styles = StyleSheet.create({
   limitIndicator: {
     position: 'absolute',
     left: spacing.md,
-    bottom: spacing.md,
   },
 });

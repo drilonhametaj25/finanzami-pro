@@ -25,7 +25,7 @@
     },
     "android": {
       "package": "com.drilonhametaj.budgetwise",
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#8B5A7A"
@@ -44,7 +44,15 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "react-native-purchases",
+        {
+          "ios": {
+            "usesStoreKit2JWS": true
+          }
+        }
+      ]
     ],
     "extra": {
       "router": {},

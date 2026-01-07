@@ -45,3 +45,27 @@ aux
 # generated native folders
 /ios
 /android
+
+/budget-wise/ios
+/budget-wise/android
+/budget-wise/.vscode
+/budget-wise/.idea
+/budget-wise/.expo
+/budget-wise/dist
+/budget-wise/web-build
+/budget-wise/node_modules
+/budget-wise/.turbo
+/budget-wise/.expo-shared
+/budget-wise/.env*.local
+/budget-wise/*.tsbuildinfo
+/budget-wise/npm-debug.*
+/budget-wise/yarn-debug.*
+/budget-wise/yarn-error.*
+/budget-wise/.DS_Store
+/budget-wise/*.orig.*
+/budget-wise/*.jks
+/budget-wise/*.p8
+/budget-wise/*.p12
+/budget-wise/*.key
+/budget-wise/*.mobileprovision
+/budget-wise/.kotlin
